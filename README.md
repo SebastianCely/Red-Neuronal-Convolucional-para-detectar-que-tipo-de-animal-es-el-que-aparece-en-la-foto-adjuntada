@@ -44,17 +44,17 @@ clasificador_fauna/
 
 ### Paso 1: entrenar en Google Colab (notebook)
 
-1. Sube este repositorio a GitHub (o ten a mano el `.zip` del proyecto).
-2. Abre `notebook_colab.ipynb` en [Google Colab](https://colab.research.google.com)
+1. Subir este repositorio a GitHub (o ten a mano el `.zip` del proyecto).
+2. Abrir `notebook_colab.ipynb` en [Google Colab](https://colab.research.google.com)
    (*Archivo → Abrir cuaderno → GitHub*, o súbelo directamente).
-3. Activa la GPU: *Entorno de ejecución → Cambiar tipo de entorno → GPU T4*.
-4. En la primera celda cambia `REPO_URL` por la URL de tu repositorio. Si la dejas igual, el notebook te pedirá
+3. Activar la GPU: *Entorno de ejecución → Cambiar tipo de entorno → GPU T4*.
+4. En la primera celda cambiar `REPO_URL` por la URL de tu repositorio. Si se dejas igual, el notebook pedirá
    subir el `.zip` del proyecto.
-5. Ejecuta todo: *Entorno de ejecución → Ejecutar todo*. La descarga de fotos tarda unos 5–15 minutos y el
+5. Ejecutar todo: *Entorno de ejecución → Ejecutar todo*. La descarga de fotos tarda unos 5–15 minutos y el
    entrenamiento unos minutos más.
 6. Al final, la última celda descarga `modelo.zip`, `imagenes.zip`, `data_imagenes.zip` y `manifiesto.csv`.
-   Descomprímelos en las carpetas del proyecto (`modelo/`, `imagenes/`, `data/imagenes/`, `data/manifiesto.csv`).
-7. Para que el notebook quede **con sus resultados** en el repositorio: *Archivo → Guardar una copia en GitHub*,
+   Descomprimirlos en las carpetas del proyecto (`modelo/`, `imagenes/`, `data/imagenes/`, `data/manifiesto.csv`).
+7. Para que el notebook quede con sus resultados en el repositorio: *Archivo → Guardar una copia en GitHub*,
    o descárgalo con *Archivo → Descargar → .ipynb* y reemplaza `notebook_colab.ipynb`.
 
 ### Paso 2: abrir la aplicación Streamlit (en tu computador)
@@ -114,3 +114,14 @@ Los resultados se generan al ejecutar el notebook y quedan en:
 Las fotos provienen de Wikipedia/Wikimedia Commons y cada una tiene su propia licencia (en su mayoría Creative Commons).
 Se usan solo con fines académicos. El archivo `data/manifiesto.csv` guarda la URL de cada foto para poder
 atribuirla.
+
+| Modelo | Accuracy (prueba) | F1 macro (prueba) |
+|---|---|---|
+| CNN desde cero | 0.404 | 0.372 |
+| **MobileNetV2 (transferencia de aprendizaje)** | **0.877** | **0.840** |
+
+Se descargaron 1.563 fotos (70 % entrenamiento, 15 % validación, 15 % prueba = 235 fotos).
+MobileNetV2 fue el mejor modelo y es el que usa la app. Los grupos con mejor resultado
+fueron ave (F1 0.97) y mamífero (0.91); el más difícil fue reptil (0.65), que se confunde
+sobre todo con anfibio. La CNN desde cero rinde mucho peor porque hay pocas fotos de
+entrenamiento, lo que muestra la ventaja de la transferencia de aprendizaje.
