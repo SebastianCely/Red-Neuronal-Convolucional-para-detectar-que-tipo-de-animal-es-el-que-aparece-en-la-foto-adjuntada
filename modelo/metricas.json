@@ -1,0 +1,5 @@
+{
+  "modelo": "MobileNetV2",
+  "accuracy": 0.877,
+  "f1_macro": 0.84
+}
