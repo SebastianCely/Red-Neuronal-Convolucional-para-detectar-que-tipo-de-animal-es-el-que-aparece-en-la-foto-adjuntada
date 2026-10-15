@@ -5,6 +5,7 @@ es el título de su artículo. Le pedimos a Wikipedia la foto principal de cada 
 """
 import io
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
@@ -42,7 +43,7 @@ def buscar_urls(titulos):
     """
     datos = pedir_json({
         "action": "query", "format": "json", "prop": "pageimages", "piprop": "thumbnail",
-        "pithumbsize": 320, "pilimit": 50, "redirects": 1, "titles": "|".join(titulos),
+        "pithumbsize": 330, "pilimit": 50, "redirects": 1, "titles": "|".join(titulos),
     }).get("query", {})
 
     # Wikipedia puede cambiar un título (mayúsculas) o redirigirlo a otro artículo.
@@ -58,22 +59,28 @@ def buscar_urls(titulos):
 
 
 def descargar_foto(url, destino):
-    """Descarga una foto y la guarda como JPG. Devuelve True si salió bien."""
+    """Descarga una foto y la guarda como JPG.
+
+    Devuelve (True, "") si salió bien, o (False, motivo) si falló.
+    """
+    motivo = "desconocido"
     for intento in range(3):
         try:
             r = requests.get(url, headers=CABECERAS, timeout=30)
             if r.status_code == 429:          # demasiadas peticiones: esperar y reintentar
+                motivo = "error 429 (demasiadas peticiones)"
                 time.sleep(3 * (intento + 1))
                 continue
             r.raise_for_status()
             imagen = Image.open(io.BytesIO(r.content)).convert("RGB")
             if min(imagen.size) < 100:        # muy pequeña: la descartamos
-                return False
+                return False, "foto muy pequeña"
             imagen.save(destino, "JPEG", quality=90)
-            return True
-        except Exception:
+            return True, ""
+        except Exception as error:
+            motivo = f"{type(error).__name__}: {error}"[:90]
             time.sleep(1)
-    return False
+    return False, motivo
 
 
 def descargar_imagenes(tabla, por_grupo=500, carpeta=CARPETA_IMAGENES, ruta_manifiesto=RUTA_MANIFIESTO):
@@ -83,6 +90,7 @@ def descargar_imagenes(tabla, por_grupo=500, carpeta=CARPETA_IMAGENES, ruta_mani
     y crea un archivo manifiesto.csv con el animal, grupo, archivo y url de cada foto.
     """
     filas = []
+    fallos = Counter()   # cuenta los motivos por los que fallan las descargas
     for grupo, animales in tabla.groupby("grupo"):
         animales = animales.sample(frac=1, random_state=SEMILLA)  # orden al azar
         (carpeta / grupo).mkdir(parents=True, exist_ok=True)
@@ -108,10 +116,12 @@ def descargar_imagenes(tabla, por_grupo=500, carpeta=CARPETA_IMAGENES, ruta_mani
                 tareas.append((animal, url, archivo))
             tareas = tareas[:por_grupo - guardadas]   # no descargar más de las que faltan
 
-            with ThreadPoolExecutor(max_workers=4) as pool:
+            with ThreadPoolExecutor(max_workers=2) as pool:
                 resultados = list(pool.map(lambda t: descargar_foto(t[1], carpeta / t[2]), tareas))
 
-            for (animal, url, archivo), ok in zip(tareas, resultados):
+            for (animal, url, archivo), (ok, motivo) in zip(tareas, resultados):
+                if not ok:
+                    fallos[motivo] += 1
                 if ok and guardadas < por_grupo:
                     filas.append({"entidad": animal["Entity"], "pais": animal["Country"],
                                   "grupo": grupo, "archivo": archivo, "url": url})
@@ -119,6 +129,11 @@ def descargar_imagenes(tabla, por_grupo=500, carpeta=CARPETA_IMAGENES, ruta_mani
             time.sleep(0.2)
 
         print(f"{grupo:<10} {guardadas} fotos (de {len(animales)} animales)")
+
+    if not filas:   # no se descargó nada: avisar en vez de guardar un manifiesto vacío
+        raise RuntimeError(f"No se pudo descargar ninguna foto. Motivos de los fallos: {dict(fallos)}")
+    if fallos:
+        print("\nFotos que no se pudieron descargar:", dict(fallos))
 
     manifiesto = pd.DataFrame(filas)
     manifiesto.to_csv(ruta_manifiesto, index=False)
