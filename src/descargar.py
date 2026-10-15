@@ -14,8 +14,25 @@ from PIL import Image
 from datos import CARPETA_IMAGENES, RUTA_MANIFIESTO, SEMILLA
 
 API = "https://es.wikipedia.org/w/api.php"
-# Wikipedia pide identificarse al descargar de forma automática
-CABECERAS = {"User-Agent": "clasificador-fauna/1.0 (proyecto universitario de deep learning)"}
+# Wikipedia pide identificarse (con un enlace de contacto) al descargar de forma automática.
+# Si te sale un error 403, cambia el enlace por el de tu propio GitHub.
+CONTACTO = "https://github.com/SebastianCely"
+CABECERAS = {"User-Agent": f"ClasificadorFauna/1.0 (proyecto academico de deep learning; {CONTACTO}) python-requests"}
+
+
+def pedir_json(params, intentos=5):
+    """Consulta la API de Wikipedia. Si responde algo que no es JSON
+    (por ejemplo error 429 "demasiadas peticiones" o 403), espera y reintenta."""
+    for intento in range(intentos):
+        respuesta = requests.get(API, headers=CABECERAS, params=params, timeout=30)
+        if respuesta.status_code == 200:
+            try:
+                return respuesta.json()
+            except ValueError:
+                pass
+        time.sleep(3 * (intento + 1))
+    raise RuntimeError(f"Wikipedia no respondió bien (código {respuesta.status_code}). "
+                       f"Respuesta: {respuesta.text[:200]}")
 
 
 def buscar_urls(titulos):
@@ -23,11 +40,10 @@ def buscar_urls(titulos):
 
     Devuelve un diccionario {título: url_de_la_foto} solo con los que tienen foto.
     """
-    respuesta = requests.get(API, headers=CABECERAS, timeout=30, params={
+    datos = pedir_json({
         "action": "query", "format": "json", "prop": "pageimages", "piprop": "thumbnail",
         "pithumbsize": 320, "pilimit": 50, "redirects": 1, "titles": "|".join(titulos),
-    })
-    datos = respuesta.json().get("query", {})
+    }).get("query", {})
 
     # Wikipedia puede cambiar un título (mayúsculas) o redirigirlo a otro artículo.
     # Seguimos esos cambios para saber qué foto corresponde a cada título original.
