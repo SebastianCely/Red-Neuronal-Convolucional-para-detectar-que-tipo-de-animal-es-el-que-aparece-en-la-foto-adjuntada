@@ -108,8 +108,16 @@ def descargar_imagenes(tabla, por_grupo=500, carpeta=CARPETA_IMAGENES, ruta_mani
             tareas = []
             for posicion, (_, animal) in enumerate(lote.iterrows()):
                 url = urls.get(animal["Entity"])
-                # Solo fotos JPG (los PNG y SVG suelen ser mapas o dibujos)
-                if not url or url in urls_vistas or not url.lower().endswith((".jpg", ".jpeg")):
+                if not url:
+                    fallos["el animal no tiene foto en Wikipedia"] += 1
+                    continue
+                if url in urls_vistas:
+                    fallos["foto repetida"] += 1
+                    continue
+                # Solo fotos JPG (los PNG y SVG suelen ser mapas o dibujos).
+                # Los enlaces terminan en "?utm_source=..." así que lo quitamos antes de mirar la extensión.
+                if not url.split("?")[0].lower().endswith((".jpg", ".jpeg")):
+                    fallos["la foto no es JPG"] += 1
                     continue
                 urls_vistas.add(url)
                 archivo = f"{grupo}/{grupo}_{inicio + posicion:05d}.jpg"  # nombre único
@@ -133,7 +141,7 @@ def descargar_imagenes(tabla, por_grupo=500, carpeta=CARPETA_IMAGENES, ruta_mani
     if not filas:   # no se descargó nada: avisar en vez de guardar un manifiesto vacío
         raise RuntimeError(f"No se pudo descargar ninguna foto. Motivos de los fallos: {dict(fallos)}")
     if fallos:
-        print("\nFotos que no se pudieron descargar:", dict(fallos))
+        print("\nAnimales descartados y motivos:", dict(fallos))
 
     manifiesto = pd.DataFrame(filas)
     manifiesto.to_csv(ruta_manifiesto, index=False)
